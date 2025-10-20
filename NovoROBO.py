@@ -3,7 +3,7 @@ from time import sleep
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-import pyautogui
+#import pyautogui 
 
 load_dotenv()
 
@@ -46,7 +46,10 @@ def run(playwright: Playwright) -> None:
         sleep(1)
         page.get_by_role("link", name="MANUFATURA ").click()
         sleep(1)
-        page.get_by_role("link", name="OEE Protótipo").click()
+        page.evaluate("""
+        loadPageNew('dash.html', 'DASH', 'pageContent',
+                'https://datadriven.datawake.com.br:8091/',
+                'frameDash', 'OEE-Online');""")
         sleep(1)
         page.locator("header i").click()
     except Exception as e:
@@ -70,12 +73,10 @@ def run(playwright: Playwright) -> None:
         linha_mqb = iframe.locator("button:has-text('Detalhes')").nth(nth_value)
         linha_mqb.click(timeout=5000)
 
-        pyautogui.click(x=1000, y=500)
-        pyautogui.press("f11")
+        #pyautogui.click(x=1000, y=500)
+        #pyautogui.press("f11")
 
         sleep(2)
-
-        page.evaluate("document.body.style.zoom='90%'")
 
     except TimeoutError as te:
         print(f"[ERRO] Timeout ao tentar clicar nos botões dentro do iframe: {te}")
