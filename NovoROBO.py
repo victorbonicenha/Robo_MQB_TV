@@ -9,13 +9,12 @@ load_dotenv()
 
 def credenciais():
     return {
-        "NTH": int(os.getenv("NTH")),
+        "NTH_1": int(os.getenv("NTH_1")),
+        "NTH_2": int(os.getenv("NTH_2")),
         "login": os.getenv("Login"),
-        "senha": os.getenv("senha")
-    }
+        "senha": os.getenv("senha")}
 
 dados = credenciais()
-nth_value = dados["NTH"]
 
 def run(playwright: Playwright) -> None:
     print(f"Iniciando navegador às {datetime.now()}")
@@ -40,7 +39,18 @@ def run(playwright: Playwright) -> None:
 
     sleep(5)
     try:
-        page.locator("header i").click()
+        # Loop de retentativas para o clique no 'header i'
+        for i in range(3):
+            try:
+                page.locator("header i").click()
+                print(f"[INFO] 'header i' clicado com sucesso na tentativa {i+1}.")
+                break # Sai do loop se o clique for bem-sucedido
+            except Exception as e:
+                print(f"[ERRO] Tentativa {i+1} de 3: Falha ao clicar no 'header i': {e}")
+                if i < 2: # Se não for a última tentativa, espera e tenta novamente
+                    sleep(2)
+                else: # Se a última tentativa falhar, re-lança a exceção para ser capturada pelo bloco externo
+                    raise
         sleep(1)
         page.get_by_role("link", name="DASHBOARD ").click()
         sleep(1)
@@ -58,7 +68,7 @@ def run(playwright: Playwright) -> None:
 
     sleep(10)
 
-    try:
+    def interagir_com_dashboard(page, nth_index):
         iframe = page.frame_locator("#frameDash")
 
         iframe.locator("button:has(svg.animate-spin)").click(timeout=5000)
@@ -70,7 +80,7 @@ def run(playwright: Playwright) -> None:
         iframe.locator("button:has(svg.lucide-x)").click(timeout=5000)
         sleep(3)
 
-        linha_mqb = iframe.locator("button:has-text('Detalhes')").nth(nth_value)
+        linha_mqb = iframe.locator("button:has-text('Detalhes')").nth(nth_index)
         linha_mqb.click(timeout=5000)
 
         #pyautogui.click(x=1000, y=500)
@@ -78,18 +88,25 @@ def run(playwright: Playwright) -> None:
 
         sleep(2)
 
+    try:
+        current_nth = dados["NTH_1"]
+        interagir_com_dashboard(page, current_nth)
+
+        while True:
+            print(f"[INFO] Dashboard atual: NTH={current_nth}. Próxima mudança em 30 segundos.")
+            sleep(30)
+            if current_nth == dados["NTH_1"]:
+                current_nth = dados["NTH_2"]
+            else:
+                current_nth = dados["NTH_1"]
+            print(f"[INFO] Mudando para NTH={current_nth}")
+            interagir_com_dashboard(page, current_nth)
     except TimeoutError as te:
         print(f"[ERRO] Timeout ao tentar clicar nos botões dentro do iframe: {te}")
         return
     except Exception as e:
         print(f"[ERRO] Erro ao interagir com o iframe: {e}")
         return
-
-    try:
-        while True:
-            sleep(60)
-    except KeyboardInterrupt:
-        print("\n[INFO] Interrompido manualmente pelo usuário.")
 
     browser.close()
 
