@@ -7,9 +7,8 @@ O robô:
 - Navega pelo menu lateral até o dashboard desejado.
 - Interage com botões dentro de um `iframe` (refresh, tela cheia, fechar modal).
 - Abre os detalhes da linha configurada.
-- Ajusta a tela para exibição ideal (F11 e zoom).
 - Mantém a página ativa indefinidamente até ser encerrado manualmente.
-
+- Intercala entre 2 dashboards a cada x tempo (nesse caso 30 seg)
 ---
 
 ## 📂 Estrutura do Projeto
