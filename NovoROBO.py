@@ -68,9 +68,9 @@ def run(playwright: Playwright) -> None:
 
     sleep(10)
 
-    def interagir_com_dashboard(page, nth_index):
+    # Interações iniciais com o iframe, antes do ciclo de dashboards
+    try:
         iframe = page.frame_locator("#frameDash")
-
         iframe.locator("button:has(svg.animate-spin)").click(timeout=5000)
         sleep(3)
 
@@ -80,11 +80,19 @@ def run(playwright: Playwright) -> None:
         iframe.locator("button:has(svg.lucide-x)").click(timeout=5000)
         sleep(3)
 
+        page.keyboard.press("F11")
+        sleep(1)
+    except TimeoutError as te:
+        print(f"[ERRO] Timeout ao interagir com o iframe/F11: {te}")
+        return
+    except Exception as e:
+        print(f"[ERRO] Erro ao interagir com o iframe/F11: {e}")
+        return
+
+    def interagir_com_dashboard(page, nth_index):
+        iframe = page.frame_locator("#frameDash")
         linha_mqb = iframe.locator("button:has-text('Detalhes')").nth(nth_index)
         linha_mqb.click(timeout=5000)
-
-        #pyautogui.click(x=1000, y=500)
-        #pyautogui.press("f11")
 
         sleep(2)
 
@@ -95,6 +103,11 @@ def run(playwright: Playwright) -> None:
         while True:
             print(f"[INFO] Dashboard atual: NTH={current_nth}. Próxima mudança em 30 segundos.")
             sleep(30)
+            # Clica no botão antes de mudar para o próximo dashboard
+            iframe = page.frame_locator("#frameDash")
+            iframe.locator("a").get_by_role("button").click(timeout=5000)
+            sleep(5) # Pequena espera após o clique
+
             if current_nth == dados["NTH_1"]:
                 current_nth = dados["NTH_2"]
             else:
