@@ -1,6 +1,6 @@
-# 📊 Automação Dashboard OEE (Playwright + PyAutoGUI)
+# 📊 Automação Dashboard OEE (Playwright)
 
-Este projeto automatiza o acesso e a navegação no **Dashboard OEE Protótipo** da plataforma DataDriven, utilizando **Playwright** para interação com o navegador e **PyAutoGUI** para ajustes de tela (F11 e zoom).
+Este projeto automatiza o acesso e a navegação no **Dashboard OEE Protótipo** da plataforma DataDriven, utilizando **Playwright**.
 
 O robô:
 - Faz login automático com credenciais armazenadas em um `.env`.
