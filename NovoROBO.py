@@ -40,6 +40,11 @@ def credenciais():
 
 dados = credenciais()
 
+TEMPO_ATUALIZACAO_SEGUNDOS = int(os.getenv("TEMPO_ATUALIZACAO_SEGUNDOS", "3600"))
+MODO_ATUALIZACAO = os.getenv("MODO_ATUALIZACAO", "F5").strip().upper()  # "F5" ou "REINICIAR"
+ESPERA_CARREGAMENTO_LINHAS_SEGUNDOS = int(os.getenv("ESPERA_CARREGAMENTO_LINHAS_SEGUNDOS"))
+ESPERA_ENTRE_ACOES_IFRAME_SEGUNDOS = int(os.getenv("ESPERA_ENTRE_ACOES_IFRAME_SEGUNDOS"))
+
 
 def clicar_menu(page, tentativas=3):
 
@@ -86,11 +91,79 @@ def abrir_dashboard(page):
 
     clicar_menu(page)
 
+
+def interacoes_iniciais_iframe(page):
+    # Interações iniciais com o iframe, antes do ciclo de dashboards
+    for tentativa in range(1, 3):
+        try:
+            iframe = page.frame_locator("#frameDash")
+            iframe.locator("button:has(svg.animate-spin)").click(timeout=8000)
+            sleep(ESPERA_ENTRE_ACOES_IFRAME_SEGUNDOS + 1)
+
+            iframe.locator("button:has-text('Modo Tela Cheia')").click(timeout=8000)
+            sleep(ESPERA_ENTRE_ACOES_IFRAME_SEGUNDOS)
+
+            iframe.locator("button:has(svg.lucide-x)").click(timeout=8000)
+            sleep(ESPERA_ENTRE_ACOES_IFRAME_SEGUNDOS + 1)
+
+            page.keyboard.press("F11")
+            sleep(2)
+            return
+        except TimeoutError as te:
+            log(f"Timeout ao interagir com o iframe/F11 (tentativa {tentativa}/2): {te}")
+            sleep(2)
+
+
+def tentar_abrir_dashboard_com_retry(page, tentativas=2, motivo=""):
+    """
+    Tenta abrir DASHBOARD + selecionar a linha.
+    Se falhar nas tentativas, avisa via Telegram.
+    """
+    ultimo_erro = None
+
+    for tentativa in range(1, tentativas + 1):
+        try:
+            log(
+                f"Abrindo DASHBOARD (tentativa {tentativa}/{tentativas})"
+                + (f" - {motivo}" if motivo else "")
+            )
+
+            abrir_dashboard(page)
+            page.wait_for_selector("#frameDash", timeout=30000)
+            sleep(1)
+
+            iframe = page.frame_locator("#frameDash")
+            abrir_linha(iframe)
+            interacoes_iniciais_iframe(page)
+            return True
+
+        except Exception as e:
+            ultimo_erro = e
+            log(f"Falha ao abrir DASHBOARD: {e}")
+
+            # tenta recuperar a página antes de repetir
+            try:
+                page.reload()
+                page.wait_for_load_state("networkidle", timeout=60000)
+            except:
+                pass
+
+            sleep(2)
+
+    telegram(
+        "Sistema fora do ar: não foi possível abrir o DASHBOARD "
+        f"(linha {dados['linha']}). Motivo: {motivo}. Erro: {str(ultimo_erro)}"
+    )
+    return False
+
 def abrir_linha(iframe):
 
     log("Procurando linha...")
+    sleep(ESPERA_CARREGAMENTO_LINHAS_SEGUNDOS)
 
     botoes = iframe.locator("text=Detalhes")
+    botoes.first.wait_for(timeout=15000)
+    sleep(2)
 
     count = botoes.count()
 
@@ -118,10 +191,11 @@ def abrir_linha(iframe):
     raise Exception("Linha não encontrada")
     
 def monitorar_dashboard(page):
+    sucesso = tentar_abrir_dashboard_com_retry(page, tentativas=2, motivo="inicial")
+    if not sucesso:
+        raise Exception("Não foi possível abrir DASHBOARD após retries")
 
     iframe = page.frame_locator("#frameDash")
-
-    abrir_linha(iframe)
 
     log("Dashboard aberto")
 
@@ -165,45 +239,40 @@ def monitorar_dashboard(page):
                 log("Dashboard atualizou normalmente")
 
             # -----------------------------
-            # RELOAD A CADA 1 HORA
+            # RELOAD A CADA TEMPO CONFIGURADO
             # -----------------------------
 
-            if time() - ultimo_reload > 3600:
+            if time() - ultimo_reload > TEMPO_ATUALIZACAO_SEGUNDOS:
 
-                log("1 hora atingida. Recarregando dashboard")
+                log(f"Tempo de atualização atingido. Modo: {MODO_ATUALIZACAO}")
 
-                sucesso = False
-
-                for tentativa in range(2):
-
-                    try:
-
-                        log(f"Tentativa reload ({tentativa+1}/2)")
-
+                try:
+                    if MODO_ATUALIZACAO == "F5":
                         page.keyboard.press("F5")
+                    else:
+                        page.reload()
 
-                        page.wait_for_load_state("networkidle", timeout=60000)
+                    page.wait_for_load_state("networkidle", timeout=60000)
+                except Exception as e:
+                    log(f"Falha durante acionamento da atualização: {e}")
 
-                        page.wait_for_selector("#frameDash", timeout=60000)
-
-                        iframe = page.frame_locator("#frameDash")
-
-                        abrir_linha(iframe)
-
-                        sucesso = True
-
-                        log("Reload realizado com sucesso")
-
-                        break
-
-                    except Exception as e:
-
-                        log(f"Falha no reload: {e}")
+                sucesso = tentar_abrir_dashboard_com_retry(
+                    page,
+                    tentativas=2,
+                    motivo=f"atualização periódica ({MODO_ATUALIZACAO})",
+                )
 
                 if not sucesso:
+                    # evita loop apertado; tenta de novo no próximo ciclo
+                    ultima_hora = None
+                    tempo_sem_mudar = 0
+                    ultimo_reload = time()
+                    sleep(30)
+                    continue
 
-                    telegram(f"OEE da linha {dados['linha']} está fora do ar")
-
+                iframe = page.frame_locator("#frameDash")
+                ultima_hora = None
+                tempo_sem_mudar = 0
                 ultimo_reload = time()
 
         except TimeoutError:
@@ -214,16 +283,21 @@ def monitorar_dashboard(page):
 
             page.reload()
 
-            page.wait_for_load_state("networkidle")
+            page.wait_for_load_state("networkidle", timeout=60000)
 
-            abrir_dashboard(page)
+            sucesso = tentar_abrir_dashboard_com_retry(
+                page,
+                tentativas=2,
+                motivo="recuperação pós-travamento",
+            )
+            if not sucesso:
+                raise TimeoutError("DASHBOARD fora do ar após recuperação")
 
             iframe = page.frame_locator("#frameDash")
 
-            abrir_linha(iframe)
-
             ultima_hora = None
             tempo_sem_mudar = 0
+            ultimo_reload = time()
 
         sleep(120)
         
@@ -274,11 +348,7 @@ def run(playwright):
 
             sleep(5)
 
-            log("Abrindo dashboard")
-            sleep(3)
-            abrir_dashboard(page)
-            sleep(3)
-            page.wait_for_selector("#frameDash", timeout=30000)
+            log("Iniciando monitoramento do dashboard")
             sleep(3)
             monitorar_dashboard(page)
             sleep(3)
@@ -305,4 +375,4 @@ if __name__ == "__main__":
 
     with sync_playwright() as playwright:
 
-        run(playwri
+        run(playwright)
