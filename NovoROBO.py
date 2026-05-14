@@ -3,7 +3,7 @@ from time import sleep, time
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-import pyautogui
+import subprocess
 import requests
 
 load_dotenv()
@@ -332,7 +332,7 @@ def run(playwright):
 
             sleep(3)
 
-            pyautogui.press("f11")
+            subprocess.run(["xdotool", "key", "F11"])
 
             sleep(3)
 
