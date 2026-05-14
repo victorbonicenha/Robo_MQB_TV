@@ -63,9 +63,20 @@ playwright install
 🔑 Configuração do arquivo .env
 Na raiz do projeto, crie um arquivo chamado .env com o seguinte conteúdo:
 ```bash
-Login=seu_email_aqui
-senha=sua_senha_aqui
-NTH=0   # índice da linha "Detalhes" que deseja abrir
+# Credenciais
+Login=
+senha=
+Nome_linha=
+
+# Telegram
+Telegram_Token=
+Telegram_Chat_ID=
+
+# Configurações
+TEMPO_ATUALIZACAO_SEGUNDOS=3600
+MODO_ATUALIZACAO=F5
+ESPERA_CARREGAMENTO_LINHAS_SEGUNDOS=5
+ESPERA_ENTRE_ACOES_IFRAME_SEGUNDOS=2
 ```
 
 ---
